@@ -1,533 +1,583 @@
-<script>
-    // Весь код запускается только после загрузки страницы
-    document.addEventListener('DOMContentLoaded', function() {
-        
-    // State
-    let state = {
-        currentTask: null,
-        userAnswer: '',
-        showResult: null,
-        score: { correct: 0, total: 0 },
-        isRecording: false,
-        activeTab: 'tasks',
-        selectedCategory: 'all'
-    };
+<script type="text/babel">
+    const { useState, useEffect, useRef } = React;
 
-    const vocabulary = {
-        ostavatsya: {
-            'оставаться-остаться': {
-                definition: 'to remain, to stay (in a place or situation)',
-                example: 'Я останусь дома сегодня (I will stay home today)',
-                forms: 'Формы: "я останусь" (I will stay), "он остался" (he stayed), "мы оставались" (we were staying)',
-                phrases: ['Я останусь дома', 'Он остался работать', 'Останься со мной']
-            },
-            'остаться на ночь': {
-                definition: 'to stay overnight',
-                example: 'Мы остались в Москве на месяц (We stayed in Moscow for a month)',
-                forms: 'Контекст: используется когда человек продолжает быть в месте или ситуации',
-                phrases: ['Остаться на ночь', 'Остаться в городе', 'Остаться одному']
-            }
-        },
-        ostanavlivatsya: {
-            'останавливаться-остановиться': {
-                definition: 'to stop (moving); to stay at (hotel/place temporarily)',
-                example: 'Автобус остановился на светофоре (The bus stopped at the traffic light)',
-                forms: 'Формы: "я остановлюсь" (I will stop), "он остановился" (he stopped), "останови!" (stop!)',
-                phrases: ['Останови машину!', 'Он остановился', 'Где вы остановились?']
-            },
-            'остановиться в отеле': {
-                definition: 'to stay at a hotel',
-                example: 'Мы остановились в отеле (We are staying at a hotel)',
-                forms: 'Контекст: для временного проживания ИЛИ прекращения движения',
-                phrases: ['Остановиться в гостинице', 'Остановиться на секунду', 'Не останавливайся!']
-            }
-        },
-        stanovitsya: {
-            'становиться-стать': {
-                definition: 'to become (change into something); to start being',
-                example: 'Она стала учителем (She became a teacher)',
-                forms: 'Формы: "я стану" (I will become), "он стал" (he became), "стань!" (become!)',
-                phrases: ['Я стану врачом', 'Стало темно', 'Он становится лучше']
-            },
-            'стать взрослым': {
-                definition: 'to become an adult',
-                example: 'Погода становится холоднее (The weather is getting colder)',
-                forms: 'Контекст: изменение состояния или профессии, превращение в что-то другое',
-                phrases: ['Стать известным', 'Стать другом', 'Стало холодно']
-            }
-        }
-    };
+    // Lucide icons as simple SVG components
+    const Mic = ({ size = 20, className = "" }) => (
+        <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="23"></line>
+            <line x1="8" y1="23" x2="16" y2="23"></line>
+        </svg>
+    );
 
-    const sampleTasks = [
-        {type:'translation_en_ru',category:'ostavatsya',question:'Translate: "I will stay home today"',answer:'я останусь дома сегодня',alternatives:['я останусь дома сегодня','сегодня я останусь дома'],word:'оставаться-остаться'},
-        {type:'translation_ru_en',category:'ostavatsya',question:'Переведите: "Мы остались в Москве на месяц"',answer:'we stayed in moscow for a month',alternatives:['we stayed in moscow for a month','we remained in moscow for a month'],word:'оставаться-остаться'},
-        {type:'multiple_choice',category:'ostavatsya',question:'Я ___ дома вчера',options:['остался','остановился','стал','оставался'],correct:0,word:'оставаться-остаться'},
-        {type:'fill_blanks',category:'ostavatsya',question:'Заполните: "Он ___ работать после уроков"',answer:'остался',hint:'(perfective aspect, past tense)',word:'оставаться-остаться'},
-        {type:'translation_en_ru',category:'ostavatsya',question:'Translate: "Stay with me" (imperative)',answer:'останься со мной',alternatives:['останься со мной','оставайся со мной'],word:'оставаться-остаться'},
-        {type:'situational',category:'ostavatsya',question:'Ситуация: Ваш друг уезжает. Вы хотите, чтобы он остался. Что сказать?',context:'Выразите просьбу в императиве',expectedElements:['останься','оставайся'],word:'оставаться-остаться'},
-        {type:'listening',category:'ostavatsya',question:'Прослушайте и повторите: "Я оставался там всю неделю"',audio:'Я оставался там всю неделю',word:'оставаться-остаться'},
-        {type:'multiple_choice',category:'ostavatsya',question:'Завтра я ___ дома (future tense)',options:['останусь','остановлюсь','стану','буду оставаться'],correct:0,word:'оставаться-остаться'},
-        {type:'translation_en_ru',category:'ostanavlivatsya',question:'Translate: "The bus stopped at the traffic light"',answer:'автобус остановился на светофоре',alternatives:['автобус остановился на светофоре'],word:'останавливаться-остановиться'},
-        {type:'translation_ru_en',category:'ostanavlivatsya',question:'Переведите: "Где вы остановились?"',answer:'where are you staying',alternatives:['where are you staying','where did you stop'],word:'останавливаться-остановиться'},
-        {type:'multiple_choice',category:'ostanavlivatsya',question:'Мы ___ в отеле (staying at a hotel)',options:['остановились','остались','стали','останавливались'],correct:0,word:'останавливаться-остановиться'},
-        {type:'fill_blanks',category:'ostanavlivatsya',question:'Заполните: "___ машину!" (imperative)',answer:'останови',hint:'(stop the car!)',word:'останавливаться-остановиться'},
-        {type:'translation_en_ru',category:'ostanavlivatsya',question:'Translate: "Don\'t stop!" (imperative)',answer:'не останавливайся',alternatives:['не останавливайся','не останавливайтесь'],word:'останавливаться-остановиться'},
-        {type:'situational',category:'ostanavlivatsya',question:'Ситуация: Вы приехали в новый город. Друг спрашивает где вы живете. Что ответить?',context:'Вы в гостинице "Москва"',expectedElements:['остановился','остановилась','гостинице','отеле'],word:'останавливаться-остановиться'},
-        {type:'listening',category:'ostanavlivatsya',question:'Прослушайте и повторите: "Он остановился и посмотрел назад"',audio:'Он остановился и посмотрел назад',word:'останавливаться-остановиться'},
-        {type:'multiple_choice',category:'ostanavlivatsya',question:'Такси ___ у подъезда (past tense)',options:['остановилось','осталось','стало','останавливалось'],correct:0,word:'останавливаться-остановиться'},
-        {type:'translation_en_ru',category:'stanovitsya',question:'Translate: "She became a teacher"',answer:'она стала учителем',alternatives:['она стала учителем','она стала учительницей'],word:'становиться-стать'},
-        {type:'translation_ru_en',category:'stanovitsya',question:'Переведите: "Я стану врачом"',answer:'i will become a doctor',alternatives:['i will become a doctor'],word:'становиться-стать'},
-        {type:'multiple_choice',category:'stanovitsya',question:'___ темно (It became dark)',options:['Стало','Остало','Остановилось','Становилось'],correct:0,word:'становиться-стать'},
-        {type:'fill_blanks',category:'stanovitsya',question:'Заполните: "Он ___ все лучше"',answer:'становится',hint:'(imperfective, present tense)',word:'становиться-стать'},
-        {type:'translation_en_ru',category:'stanovitsya',question:'Translate: "The weather is getting colder"',answer:'погода становится холоднее',alternatives:['погода становится холоднее','становится холоднее'],word:'становиться-стать'},
-        {type:'situational',category:'stanovitsya',question:'Ситуация: Ваш друг спрашивает о ваших планах на будущее. Вы хотите быть инженером.',context:'Расскажите о своей профессии в будущем',expectedElements:['стану','инженером'],word:'становиться-стать'},
-        {type:'listening',category:'stanovitsya',question:'Прослушайте и повторите: "Стань на место!"',audio:'Стань на место!',word:'становиться-стать'},
-        {type:'multiple_choice',category:'stanovitsya',question:'Мой брат хочет ___ программистом',options:['стать','остаться','остановиться','становиться'],correct:0,word:'становиться-стать'},
-        {type:'multiple_choice',category:'all',question:'Я хочу ___ дома и отдохнуть',options:['остаться','остановиться','стать'],correct:0,word:'mixed'},
-        {type:'multiple_choice',category:'all',question:'Мы ___ в центре города, в гостинице',options:['остановились','остались','стали'],correct:0,word:'mixed'},
-        {type:'multiple_choice',category:'all',question:'Он ___ известным актером',options:['стал','остался','остановился'],correct:0,word:'mixed'},
-        {type:'situational',category:'all',question:'Выберите правильный глагол: Машина ___ перед школой.',context:'The car stopped in front of the school',expectedElements:['остановилась'],word:'mixed'},
-        {type:'situational',category:'all',question:'Выберите правильный глагол: Дети ___ дома одни.',context:'The children remained home alone',expectedElements:['остались'],word:'mixed'},
-        {type:'situational',category:'all',question:'Выберите правильный глагол: Она ___ студенткой университета.',context:'She became a university student',expectedElements:['стала'],word:'mixed'}
-    ];
+    const MicOff = ({ size = 20, className = "" }) => (
+        <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="2" y1="2" x2="22" y2="22"></line>
+            <path d="M18.89 13.23A7.12 7.12 0 0 0 19 12v-2"></path>
+            <path d="M5 10v2a7 7 0 0 0 12 5"></path>
+            <path d="M15 9.34V5a3 3 0 0 0-5.68-1.33"></path>
+            <path d="M9 9v3a3 3 0 0 0 5.12 2.12"></path>
+            <line x1="12" y1="19" x2="12" y2="23"></line>
+            <line x1="8" y1="23" x2="16" y2="23"></line>
+        </svg>
+    );
 
-    // Делаем функции глобальными
-    window.generateRandomTask = function() {
-        const filteredTasks = state.selectedCategory === 'all' 
-            ? sampleTasks 
-            : sampleTasks.filter(task => task.category === state.selectedCategory);
-        
-        state.currentTask = filteredTasks[Math.floor(Math.random() * filteredTasks.length)];
-        state.userAnswer = '';
-        state.showResult = null;
-        render();
-    }
+    const Volume2 = ({ size = 20, className = "" }) => (
+        <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+        </svg>
+    );
 
-    window.checkAnswer = function() {
-        if (!state.currentTask) return;
-        
-        let isCorrect = false;
-        
-        switch(state.currentTask.type) {
-            case 'multiple_choice':
-                isCorrect = parseInt(state.userAnswer) === state.currentTask.correct;
-                break;
-            case 'translation_ru_en':
-            case 'translation_en_ru':
-            case 'fill_blanks':
-                const normalizedAnswer = state.userAnswer.toLowerCase().trim();
-                if (state.currentTask.alternatives) {
-                    isCorrect = state.currentTask.alternatives.some(alt => 
-                        alt.toLowerCase() === normalizedAnswer
-                    );
-                } else {
-                    isCorrect = normalizedAnswer === state.currentTask.answer.toLowerCase();
+    const RotateCcw = ({ size = 16, className = "" }) => (
+        <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+            <path d="M3 3v5h5"></path>
+        </svg>
+    );
+
+    const CheckCircle = ({ size = 20, className = "" }) => (
+        <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22,4 12,14.01 9,11.01"></polyline>
+        </svg>
+    );
+
+    const XCircle = ({ size = 20, className = "" }) => (
+        <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="15" y1="9" x2="9" y2="15"></line>
+            <line x1="9" y1="9" x2="15" y2="15"></line>
+        </svg>
+    );
+
+    const Book = ({ size = 28, className = "" }) => (
+        <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+        </svg>
+    );
+
+    const Users = ({ size = 20, className = "" }) => (
+        <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+        </svg>
+    );
+
+    const MessageCircle = ({ size = 20, className = "" }) => (
+        <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+        </svg>
+    );
+
+    const RussianVerbsApp = () => {
+        const [currentTask, setCurrentTask] = useState(null);
+        const [userAnswer, setUserAnswer] = useState('');
+        const [showResult, setShowResult] = useState(null);
+        const [score, setScore] = useState({ correct: 0, total: 0 });
+        const [isRecording, setIsRecording] = useState(false);
+        const [activeTab, setActiveTab] = useState('tasks');
+        const [selectedCategory, setSelectedCategory] = useState('all');
+
+        const vocabulary = {
+            ostavatsya: {
+                'оставаться-остаться': {
+                    definition: 'to remain, to stay (in a place or situation)',
+                    example: 'Я останусь дома сегодня (I will stay home today)',
+                    forms: 'Формы: "я останусь" (I will stay), "он остался" (he stayed), "мы оставались" (we were staying)',
+                    phrases: ['Я останусь дома', 'Он остался работать', 'Останься со мной']
+                },
+                'остаться на ночь': {
+                    definition: 'to stay overnight',
+                    example: 'Мы остались в Москве на месяц (We stayed in Moscow for a month)',
+                    forms: 'Контекст: используется когда человек продолжает быть в месте или ситуации',
+                    phrases: ['Остаться на ночь', 'Остаться в городе', 'Остаться одному']
                 }
-                break;
-            case 'situational':
-                isCorrect = state.currentTask.expectedElements.some(element =>
-                    state.userAnswer.toLowerCase().includes(element.toLowerCase())
-                );
-                break;
-            default:
-                isCorrect = true;
-        }
-        
-        state.score.correct += isCorrect ? 1 : 0;
-        state.score.total += 1;
-        state.showResult = isCorrect;
-        
-        render();
-    }
+            },
+            ostanavlivatsya: {
+                'останавливаться-остановиться': {
+                    definition: 'to stop (moving); to stay at (hotel/place temporarily)',
+                    example: 'Автобус остановился на светофоре (The bus stopped at the traffic light)',
+                    forms: 'Формы: "я остановлюсь" (I will stop), "он остановился" (he stopped), "останови!" (stop!)',
+                    phrases: ['Останови машину!', 'Он остановился', 'Где вы остановились?']
+                },
+                'остановиться в отеле': {
+                    definition: 'to stay at a hotel',
+                    example: 'Мы остановились в отеле (We are staying at a hotel)',
+                    forms: 'Контекст: для временного проживания ИЛИ прекращения движения',
+                    phrases: ['Остановиться в гостинице', 'Остановиться на секунду', 'Не останавливайся!']
+                }
+            },
+            stanovitsya: {
+                'становиться-стать': {
+                    definition: 'to become (change into something); to start being',
+                    example: 'Она стала учителем (She became a teacher)',
+                    forms: 'Формы: "я стану" (I will become), "он стал" (he became), "стань!" (become!)',
+                    phrases: ['Я стану врачом', 'Стало темно', 'Он становится лучше']
+                },
+                'стать взрослым': {
+                    definition: 'to become an adult',
+                    example: 'Погода становится холоднее (The weather is getting colder)',
+                    forms: 'Контекст: изменение состояния или профессии, превращение в что-то другое',
+                    phrases: ['Стать известным', 'Стать другом', 'Стало холодно']
+                }
+            }
+        };
 
-    window.speakText = function(text) {
-        if ('speechSynthesis' in window) {
-            window.speechSynthesis.cancel();
+        const sampleTasks = [
+            {type:'translation_en_ru',category:'ostavatsya',question:'Translate: "I will stay home today"',answer:'я останусь дома сегодня',alternatives:['я останусь дома сегодня','сегодня я останусь дома'],word:'оставаться-остаться'},
+            {type:'translation_ru_en',category:'ostavatsya',question:'Переведите: "Мы остались в Москве на месяц"',answer:'we stayed in moscow for a month',alternatives:['we stayed in moscow for a month','we remained in moscow for a month'],word:'оставаться-остаться'},
+            {type:'multiple_choice',category:'ostavatsya',question:'Я ___ дома вчера',options:['остался','остановился','стал','оставался'],correct:0,word:'оставаться-остаться'},
+            {type:'fill_blanks',category:'ostavatsya',question:'Заполните: "Он ___ работать после уроков"',answer:'остался',hint:'(perfective aspect, past tense)',word:'оставаться-остаться'},
+            {type:'translation_en_ru',category:'ostavatsya',question:'Translate: "Stay with me" (imperative)',answer:'останься со мной',alternatives:['останься со мной','оставайся со мной'],word:'оставаться-остаться'},
+            {type:'situational',category:'ostavatsya',question:'Ситуация: Ваш друг уезжает. Вы хотите, чтобы он остался. Что сказать?',context:'Выразите просьбу в императиве',expectedElements:['останься','оставайся'],word:'оставаться-остаться'},
+            {type:'listening',category:'ostavatsya',question:'Прослушайте и повторите: "Я оставался там всю неделю"',audio:'Я оставался там всю неделю',word:'оставаться-остаться'},
+            {type:'multiple_choice',category:'ostavatsya',question:'Завтра я ___ дома (future tense)',options:['останусь','остановлюсь','стану','буду оставаться'],correct:0,word:'оставаться-остаться'},
+            {type:'translation_en_ru',category:'ostanavlivatsya',question:'Translate: "The bus stopped at the traffic light"',answer:'автобус остановился на светофоре',alternatives:['автобус остановился на светофоре'],word:'останавливаться-остановиться'},
+            {type:'translation_ru_en',category:'ostanavlivatsya',question:'Переведите: "Где вы остановились?"',answer:'where are you staying',alternatives:['where are you staying','where did you stop'],word:'останавливаться-остановиться'},
+            {type:'multiple_choice',category:'ostanavlivatsya',question:'Мы ___ в отеле (staying at a hotel)',options:['остановились','остались','стали','останавливались'],correct:0,word:'останавливаться-остановиться'},
+            {type:'fill_blanks',category:'ostanavlivatsya',question:'Заполните: "___ машину!" (imperative)',answer:'останови',hint:'(stop the car!)',word:'останавливаться-остановиться'},
+            {type:'translation_en_ru',category:'ostanavlivatsya',question:'Translate: "Don\'t stop!" (imperative)',answer:'не останавливайся',alternatives:['не останавливайся','не останавливайтесь'],word:'останавливаться-остановиться'},
+            {type:'situational',category:'ostanavlivatsya',question:'Ситуация: Вы приехали в новый город. Друг спрашивает где вы живете. Что ответить?',context:'Вы в гостинице "Москва"',expectedElements:['остановился','остановилась','гостинице','отеле'],word:'останавливаться-остановиться'},
+            {type:'listening',category:'ostanavlivatsya',question:'Прослушайте и повторите: "Он остановился и посмотрел назад"',audio:'Он остановился и посмотрел назад',word:'останавливаться-остановиться'},
+            {type:'multiple_choice',category:'ostanavlivatsya',question:'Такси ___ у подъезда (past tense)',options:['остановилось','осталось','стало','останавливалось'],correct:0,word:'останавливаться-остановиться'},
+            {type:'translation_en_ru',category:'stanovitsya',question:'Translate: "She became a teacher"',answer:'она стала учителем',alternatives:['она стала учителем','она стала учительницей'],word:'становиться-стать'},
+            {type:'translation_ru_en',category:'stanovitsya',question:'Переведите: "Я стану врачом"',answer:'i will become a doctor',alternatives:['i will become a doctor'],word:'становиться-стать'},
+            {type:'multiple_choice',category:'stanovitsya',question:'___ темно (It became dark)',options:['Стало','Остало','Остановилось','Становилось'],correct:0,word:'становиться-стать'},
+            {type:'fill_blanks',category:'stanovitsya',question:'Заполните: "Он ___ все лучше"',answer:'становится',hint:'(imperfective, present tense)',word:'становиться-стать'},
+            {type:'translation_en_ru',category:'stanovitsya',question:'Translate: "The weather is getting colder"',answer:'погода становится холоднее',alternatives:['погода становится холоднее','становится холоднее'],word:'становиться-стать'},
+            {type:'situational',category:'stanovitsya',question:'Ситуация: Ваш друг спрашивает о ваших планах на будущее. Вы хотите быть инженером.',context:'Расскажите о своей профессии в будущем',expectedElements:['стану','инженером'],word:'становиться-стать'},
+            {type:'listening',category:'stanovitsya',question:'Прослушайте и повторите: "Стань на место!"',audio:'Стань на место!',word:'становиться-стать'},
+            {type:'multiple_choice',category:'stanovitsya',question:'Мой брат хочет ___ программистом',options:['стать','остаться','остановиться','становиться'],correct:0,word:'становиться-стать'},
+            {type:'multiple_choice',category:'all',question:'Я хочу ___ дома и отдохнуть',options:['остаться','остановиться','стать'],correct:0,word:'mixed'},
+            {type:'multiple_choice',category:'all',question:'Мы ___ в центре города, в гостинице',options:['остановились','остались','стали'],correct:0,word:'mixed'},
+            {type:'multiple_choice',category:'all',question:'Он ___ известным актером',options:['стал','остался','остановился'],correct:0,word:'mixed'}
+        ];
+
+        const generateRandomTask = () => {
+            const filteredTasks = selectedCategory === 'all' 
+                ? sampleTasks 
+                : sampleTasks.filter(task => task.category === selectedCategory);
             
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'ru-RU';
-            utterance.rate = 0.7;
-            utterance.pitch = 1.0;
-            utterance.volume = 1.0;
+            const randomTask = filteredTasks[Math.floor(Math.random() * filteredTasks.length)];
+            setCurrentTask({...randomTask, id: Date.now()});
+            setUserAnswer('');
+            setShowResult(null);
+        };
+
+        const checkAnswer = () => {
+            if (!currentTask) return;
             
-            const setVoice = () => {
-                const voices = window.speechSynthesis.getVoices();
-                
-                const preferredVoices = [
-                    voices.find(voice => voice.name.toLowerCase().includes('google') && voice.lang.startsWith('ru')),
-                    voices.find(voice => voice.name.toLowerCase().includes('microsoft') && voice.lang.startsWith('ru')),
-                    voices.find(voice => voice.lang === 'ru-RU'),
-                    voices.find(voice => voice.lang.startsWith('ru'))
-                ];
-                
-                const selectedVoice = preferredVoices.find(voice => voice !== undefined);
-                
-                if (selectedVoice) {
-                    utterance.voice = selectedVoice;
-                }
-                
-                try {
-                    window.speechSynthesis.speak(utterance);
-                } catch (error) {
-                    console.error('Speech error:', error);
-                }
-            };
+            let isCorrect = false;
             
-            if (window.speechSynthesis.getVoices().length > 0) {
-                setVoice();
-            } else {
-                window.speechSynthesis.onvoiceschanged = () => {
-                    setVoice();
-                    window.speechSynthesis.onvoiceschanged = null;
-                };
-                setTimeout(() => {
-                    if (window.speechSynthesis.getVoices().length === 0) {
-                        window.speechSynthesis.speak(utterance);
+            switch(currentTask.type) {
+                case 'multiple_choice':
+                    isCorrect = parseInt(userAnswer) === currentTask.correct;
+                    break;
+                case 'translation_ru_en':
+                case 'translation_en_ru':
+                case 'fill_blanks':
+                    const normalizedAnswer = userAnswer.toLowerCase().trim();
+                    if (currentTask.alternatives) {
+                        isCorrect = currentTask.alternatives.some(alt => 
+                            alt.toLowerCase() === normalizedAnswer
+                        );
+                    } else {
+                        isCorrect = normalizedAnswer === currentTask.answer.toLowerCase();
                     }
-                }, 1000);
+                    break;
+                case 'situational':
+                    isCorrect = currentTask.expectedElements.some(element =>
+                        userAnswer.toLowerCase().includes(element.toLowerCase())
+                    );
+                    break;
+                default:
+                    isCorrect = true;
             }
-        }
-    }
+            
+            setScore(prev => ({
+                correct: prev.correct + (isCorrect ? 1 : 0),
+                total: prev.total + 1
+            }));
+            
+            setShowResult(isCorrect);
+        };
 
-    window.startRecording = function() {
-        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-            alert('Ваш браузер не поддерживает распознавание речи.');
-            return;
-        }
+        const speakText = (text) => {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'ru-RU';
+                utterance.rate = 0.7;
+                utterance.pitch = 1.0;
+                utterance.volume = 1.0;
+                
+                const setVoice = () => {
+                    const voices = window.speechSynthesis.getVoices();
+                    const preferredVoices = [
+                        voices.find(voice => voice.name.toLowerCase().includes('google') && voice.lang.startsWith('ru')),
+                        voices.find(voice => voice.name.toLowerCase().includes('microsoft') && voice.lang.startsWith('ru')),
+                        voices.find(voice => voice.lang === 'ru-RU'),
+                        voices.find(voice => voice.lang.startsWith('ru'))
+                    ];
+                    const selectedVoice = preferredVoices.find(voice => voice !== undefined);
+                    if (selectedVoice) utterance.voice = selectedVoice;
+                    try { window.speechSynthesis.speak(utterance); } catch (error) { console.error(error); }
+                };
+                
+                if (window.speechSynthesis.getVoices().length > 0) {
+                    setVoice();
+                } else {
+                    window.speechSynthesis.onvoiceschanged = () => { setVoice(); window.speechSynthesis.onvoiceschanged = null; };
+                    setTimeout(() => { if (window.speechSynthesis.getVoices().length === 0) window.speechSynthesis.speak(utterance); }, 1000);
+                }
+            }
+        };
 
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const recognition = new SpeechRecognition();
-        
-        recognition.lang = 'ru-RU';
-        recognition.continuous = false;
-        recognition.interimResults = false;
-        
-        recognition.onstart = () => {
-            state.isRecording = true;
-            state.userAnswer = 'Говорите...';
-            render();
+        const startRecording = async () => {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert('Ваш браузер не поддерживает распознавание речи.');
+                return;
+            }
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'ru-RU';
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            
+            recognition.onstart = () => { setIsRecording(true); setUserAnswer('Говорите...'); };
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript.trim();
+                setUserAnswer(transcript);
+                setIsRecording(false);
+            };
+            recognition.onerror = () => { setIsRecording(false); setUserAnswer('Ошибка. Попробуйте снова.'); };
+            recognition.onend = () => { setIsRecording(false); };
+            recognition.start();
         };
-        
-        recognition.onresult = (event) => {
-            const transcript = event.results[0][0].transcript.trim();
-            state.userAnswer = transcript;
-            state.isRecording = false;
-            render();
-        };
-        
-        recognition.onerror = () => {
-            state.isRecording = false;
-            state.userAnswer = 'Ошибка. Попробуйте снова.';
-            render();
-        };
-        
-        recognition.onend = () => {
-            state.isRecording = false;
-            render();
-        };
-        
-        recognition.start();
-    }
 
-    function render() {
-        const root = document.getElementById('root');
-        if (!root) return;
-        
-        const html = `
-            <div class="max-w-4xl mx-auto bg-gray-50 min-h-screen">
-                <div class="bg-blue-600 text-white p-6">
-                    <h1 class="text-2xl font-bold flex items-center gap-2">
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-                        </svg>
+        useEffect(() => { generateRandomTask(); }, [selectedCategory]);
+
+        const renderTask = () => {
+            if (!currentTask) return null;
+
+            switch(currentTask.type) {
+                case 'multiple_choice':
+                    return (
+                        <div className="space-y-4">
+                            <p className="text-lg font-medium">{currentTask.question}</p>
+                            <div className="grid grid-cols-2 gap-2">
+                                {currentTask.options.map((option, index) => (
+                                    <button
+                                        key={index}
+                                        onClick={() => setUserAnswer(index.toString())}
+                                        className={`p-3 border rounded-lg transition-colors ${
+                                            userAnswer === index.toString()
+                                                ? 'bg-blue-500 text-white'
+                                                : 'bg-white hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        {option}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                
+                case 'listening':
+                    return (
+                        <div className="space-y-4">
+                            <p className="text-lg font-medium">{currentTask.question}</p>
+                            <button
+                                onClick={() => speakText(currentTask.audio)}
+                                className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600"
+                            >
+                                <Volume2 size={20} />
+                                Прослушать
+                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={isRecording ? () => {} : startRecording}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+                                        isRecording 
+                                            ? 'bg-red-500 hover:bg-red-600' 
+                                            : 'bg-blue-500 hover:bg-blue-600'
+                                    } text-white`}
+                                >
+                                    {isRecording ? <MicOff size={20} /> : <Mic size={20} />}
+                                    {isRecording ? 'Остановить' : 'Записать ответ'}
+                                </button>
+                            </div>
+                        </div>
+                    );
+                
+                case 'situational':
+                    return (
+                        <div className="space-y-4">
+                            <div className="bg-yellow-50 p-4 rounded-lg">
+                                <h3 className="font-semibold text-yellow-800">Ситуация:</h3>
+                                <p className="text-yellow-700">{currentTask.question}</p>
+                                {currentTask.context && (
+                                    <p className="text-sm text-yellow-600 mt-2">
+                                        Контекст: {currentTask.context}
+                                    </p>
+                                )}
+                            </div>
+                            <textarea
+                                value={userAnswer}
+                                onChange={(e) => setUserAnswer(e.target.value)}
+                                placeholder="Введите ваш ответ..."
+                                className="w-full p-3 border border-gray-300 rounded-lg"
+                                rows="3"
+                            />
+                        </div>
+                    );
+                
+                default:
+                    return (
+                        <div className="space-y-4">
+                            <p className="text-lg font-medium">{currentTask.question}</p>
+                            {currentTask.hint && (
+                                <p className="text-sm text-gray-600">{currentTask.hint}</p>
+                            )}
+                            <input
+                                type="text"
+                                value={userAnswer}
+                                onChange={(e) => setUserAnswer(e.target.value)}
+                                placeholder="Введите ваш ответ..."
+                                className="w-full p-3 border border-gray-300 rounded-lg"
+                                onKeyPress={(e) => e.key === 'Enter' && checkAnswer()}
+                            />
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={isRecording ? () => {} : startRecording}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+                                        isRecording 
+                                            ? 'bg-red-500 hover:bg-red-600' 
+                                            : 'bg-blue-500 hover:bg-blue-600'
+                                    } text-white`}
+                                >
+                                    {isRecording ? <MicOff size={20} /> : <Mic size={20} />}
+                                    Голосовой ответ
+                                </button>
+                            </div>
+                        </div>
+                    );
+            }
+        };
+
+        const renderVocabulary = () => (
+            <div className="space-y-6">
+                {Object.entries(vocabulary).map(([category, words]) => (
+                    <div key={category} className="bg-white rounded-lg p-6 shadow-sm border">
+                        <h3 className="text-xl font-semibold mb-4 text-blue-600">
+                            {category === 'ostavatsya' ? '🏠 Оставаться-остаться (to remain, to stay)' :
+                             category === 'ostanavlivatsya' ? '⏸️ Останавливаться-остановиться (to stop)' : 
+                             '✨ Становиться-стать (to become)'}
+                        </h3>
+                        <div className="grid gap-4">
+                            {Object.entries(words).map(([word, info]) => (
+                                <div key={word} className="border-l-4 border-blue-200 pl-4">
+                                    <div className="flex items-center justify-between">
+                                        <h4 className="font-semibold text-lg">{word}</h4>
+                                        <button
+                                            onClick={() => speakText(word)}
+                                            className="text-blue-500 hover:text-blue-700"
+                                        >
+                                            <Volume2 size={20} />
+                                        </button>
+                                    </div>
+                                    <p className="text-gray-600">{info.definition}</p>
+                                    <div className="flex items-center gap-2 mt-2">
+                                        <p className="text-green-700 flex-1">{info.example}</p>
+                                        <button
+                                            onClick={() => speakText(info.example.split(' (')[0])}
+                                            className="text-green-600 hover:text-green-800"
+                                        >
+                                            <Volume2 size={16} />
+                                        </button>
+                                    </div>
+                                    <div className="mt-2">
+                                        <p className="text-sm text-gray-500 mb-2">{info.forms}</p>
+                                        {info.phrases && (
+                                            <div className="space-y-1">
+                                                {info.phrases.map((phrase, index) => (
+                                                    <div key={index} className="flex items-center gap-2">
+                                                        <span className="text-sm text-blue-600">• {phrase}</span>
+                                                        <button
+                                                            onClick={() => speakText(phrase)}
+                                                            className="text-blue-500 hover:text-blue-700"
+                                                        >
+                                                            <Volume2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
+
+        return (
+            <div className="max-w-4xl mx-auto bg-gray-50 min-h-screen">
+                <div className="bg-blue-600 text-white p-6">
+                    <h1 className="text-2xl font-bold flex items-center gap-2">
+                        <Book size={28} />
                         Оставаться vs Останавливаться vs Становиться
                     </h1>
-                    <p class="mt-2 opacity-90">
+                    <p className="mt-2 opacity-90">
                         Учимся различать похожие русские глаголы
                     </p>
-                    <div class="mt-4 flex gap-4 text-sm">
-                        <span>Правильно: ${state.score.correct}</span>
-                        <span>Всего: ${state.score.total}</span>
-                        <span>Точность: ${state.score.total > 0 ? Math.round((state.score.correct / state.score.total) * 100) : 0}%</span>
+                    <div className="mt-4 flex gap-4 text-sm">
+                        <span>Правильно: {score.correct}</span>
+                        <span>Всего: {score.total}</span>
+                        <span>Точность: {score.total > 0 ? Math.round((score.correct / score.total) * 100) : 0}%</span>
                     </div>
                 </div>
 
-                <div class="flex border-b bg-white">
-                    <button onclick="switchTab('tasks')" class="flex-1 p-4 text-center font-medium ${
-                        state.activeTab === 'tasks' 
-                            ? 'border-b-2 border-blue-500 text-blue-600' 
-                            : 'text-gray-600 hover:text-gray-800'
-                    }">
-                        <svg class="mx-auto mb-1" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
-                        </svg>
+                <div className="flex border-b bg-white">
+                    <button
+                        onClick={() => setActiveTab('tasks')}
+                        className={`flex-1 p-4 text-center font-medium ${
+                            activeTab === 'tasks' 
+                                ? 'border-b-2 border-blue-500 text-blue-600' 
+                                : 'text-gray-600 hover:text-gray-800'
+                        }`}
+                    >
+                        <MessageCircle className="mx-auto mb-1" size={20} />
                         Задания
                     </button>
-                    <button onclick="switchTab('vocabulary')" class="flex-1 p-4 text-center font-medium ${
-                        state.activeTab === 'vocabulary' 
-                            ? 'border-b-2 border-blue-500 text-blue-600' 
-                            : 'text-gray-600 hover:text-gray-800'
-                    }">
-                        <svg class="mx-auto mb-1" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="9" cy="7" r="4"></circle>
-                        </svg>
+                    <button
+                        onClick={() => setActiveTab('vocabulary')}
+                        className={`flex-1 p-4 text-center font-medium ${
+                            activeTab === 'vocabulary' 
+                                ? 'border-b-2 border-blue-500 text-blue-600' 
+                                : 'text-gray-600 hover:text-gray-800'
+                        }`}
+                    >
+                        <Users className="mx-auto mb-1" size={20} />
                         Словарь
                     </button>
                 </div>
 
-                <div class="p-6">
-                    ${state.activeTab === 'tasks' ? renderTasks() : renderVocabulary()}
-                </div>
-            </div>
-        `;
-        
-        root.innerHTML = html;
-    }
-
-    function renderTasks() {
-        if (!state.currentTask) return '<p>Загрузка...</p>';
-        
-        let html = `
-            <div class="space-y-6">
-                <div class="flex gap-2 flex-wrap">
-                    <button onclick="setCategory('all')" class="px-4 py-2 rounded-lg ${
-                        state.selectedCategory === 'all' 
-                            ? 'bg-blue-500 text-white' 
-                            : 'bg-white border hover:bg-gray-50'
-                    }">
-                        Все категории
-                    </button>
-                    <button onclick="setCategory('ostavatsya')" class="px-4 py-2 rounded-lg ${
-                        state.selectedCategory === 'ostavatsya' 
-                            ? 'bg-blue-500 text-white' 
-                            : 'bg-white border hover:bg-gray-50'
-                    }">
-                        🏠 Оставаться-остаться
-                    </button>
-                    <button onclick="setCategory('ostanavlivatsya')" class="px-4 py-2 rounded-lg ${
-                        state.selectedCategory === 'ostanavlivatsya' 
-                            ? 'bg-blue-500 text-white' 
-                            : 'bg-white border hover:bg-gray-50'
-                    }">
-                        ⏸️ Останавливаться-остановиться
-                    </button>
-                    <button onclick="setCategory('stanovitsya')" class="px-4 py-2 rounded-lg ${
-                        state.selectedCategory === 'stanovitsya' 
-                            ? 'bg-blue-500 text-white' 
-                            : 'bg-white border hover:bg-gray-50'
-                    }">
-                        ✨ Становиться-стать
-                    </button>
-                </div>
-
-                <div class="bg-white rounded-lg p-6 shadow-sm border">
-                    ${state.showResult !== null ? `
-                        <div class="mb-4 p-4 rounded-lg flex items-center gap-2 ${
-                            state.showResult 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-red-100 text-red-800'
-                        }">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                ${state.showResult 
-                                    ? '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22,4 12,14.01 9,11.01"></polyline>'
-                                    : '<circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line>'
-                                }
-                            </svg>
-                            ${state.showResult ? 'Правильно!' : `Неправильно. Правильный ответ: ${state.currentTask.answer || 'см. варианты выше'}`}
-                        </div>
-                    ` : ''}
-                    
-                    ${renderTaskContent()}
-                    
-                    <div class="mt-6 flex gap-3">
-                        ${state.showResult === null ? `
-                            <button onclick="checkAnswer()" ${!state.userAnswer.trim() ? 'disabled' : ''} class="bg-green-500 text-white px-6 py-2 rounded-lg hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed">
-                                Проверить
-                            </button>
-                        ` : `
-                            <button onclick="generateRandomTask()" class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 flex items-center gap-2">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
-                                    <path d="M3 3v5h5"></path>
-                                </svg>
-                                Следующее задание
-                            </button>
-                        `}
-                        <button onclick="generateRandomTask()" class="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 flex items-center gap-2">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
-                                <path d="M3 3v5h5"></path>
-                            </svg>
-                            Новое задание
-                        </button>
-                    </div>
-                </div>
-
-                ${state.currentTask.word && vocabulary[state.currentTask.category]?.[state.currentTask.word] ? `
-                    <div class="bg-blue-50 rounded-lg p-4">
-                        <h3 class="font-semibold text-blue-800 mb-2">Изучаемое слово:</h3>
-                        <div class="text-blue-700">
-                            <p class="font-medium">${state.currentTask.word}</p>
-                            <p class="text-sm">${vocabulary[state.currentTask.category][state.currentTask.word].forms}</p>
-                        </div>
-                    </div>
-                ` : ''}
-            </div>
-        `;
-        
-        return html;
-    }
-
-    function renderTaskContent() {
-        const task = state.currentTask;
-        
-        switch(task.type) {
-            case 'multiple_choice':
-                return `
-                    <div class="space-y-4">
-                        <p class="text-lg font-medium">${task.question}</p>
-                        <div class="grid grid-cols-2 gap-2">
-                            ${task.options.map((option, index) => `
-                                <button onclick="setAnswer('${index}')" class="p-3 border rounded-lg transition-colors ${
-                                    state.userAnswer === index.toString()
-                                        ? 'bg-blue-500 text-white'
-                                        : 'bg-white hover:bg-gray-50'
-                                }">
-                                    ${option}
+                <div className="p-6">
+                    {activeTab === 'tasks' && (
+                        <div className="space-y-6">
+                            <div className="flex gap-2 flex-wrap">
+                                <button
+                                    onClick={() => setSelectedCategory('all')}
+                                    className={`px-4 py-2 rounded-lg ${
+                                        selectedCategory === 'all' 
+                                            ? 'bg-blue-500 text-white' 
+                                            : 'bg-white border hover:bg-gray-50'
+                                    }`}
+                                >
+                                    Все категории
                                 </button>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-            
-            case 'listening':
-                return `
-                    <div class="space-y-4">
-                        <p class="text-lg font-medium">${task.question}</p>
-                        <button onclick="speakText('${task.audio.replace(/'/g, "\\\'")}')" class="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-                            </svg>
-                            Прослушать
-                        </button>
-                        <div class="flex items-center gap-2">
-                            <button onclick="startRecording()" class="flex items-center gap-2 px-4 py-2 rounded-lg ${
-                                state.isRecording 
-                                    ? 'bg-red-500' 
-                                    : 'bg-blue-500'
-                            } text-white">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
-                                </svg>
-                                ${state.isRecording ? 'Слушаю...' : 'Записать ответ'}
-                            </button>
-                        </div>
-                    </div>
-                `;
-            
-            case 'situational':
-                return `
-                    <div class="space-y-4">
-                        <div class="bg-yellow-50 p-4 rounded-lg">
-                            <h3 class="font-semibold text-yellow-800">Ситуация:</h3>
-                            <p class="text-yellow-700">${task.question}</p>
-                            ${task.context ? `<p class="text-sm text-yellow-600 mt-2">Контекст: ${task.context}</p>` : ''}
-                        </div>
-                        <textarea oninput="setAnswer(this.value)" placeholder="Введите ваш ответ..." class="w-full p-3 border border-gray-300 rounded-lg" rows="3">${state.userAnswer}</textarea>
-                    </div>
-                `;
-            
-            default:
-                return `
-                    <div class="space-y-4">
-                        <p class="text-lg font-medium">${task.question}</p>
-                        ${task.hint ? `<p class="text-sm text-gray-600">${task.hint}</p>` : ''}
-                        <input type="text" value="${state.userAnswer}" oninput="setAnswer(this.value)" onkeypress="if(event.key==='Enter')checkAnswer()" placeholder="Введите ваш ответ..." class="w-full p-3 border border-gray-300 rounded-lg">
-                        <button onclick="startRecording()" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500 text-white">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
-                            </svg>
-                            Голосовой ответ
-                        </button>
-                    </div>
-                `;
-        }
-    }
+                                <button
+                                    onClick={() => setSelectedCategory('ostavatsya')}
+                                    className={`px-4 py-2 rounded-lg ${
+                                        selectedCategory === 'ostavatsya' 
+                                            ? 'bg-blue-500 text-white' 
+                                            : 'bg-white border hover:bg-gray-50'
+                                    }`}
+                                >
+                                    🏠 Оставаться-остаться
+                                </button>
+                                <button
+                                    onClick={() => setSelectedCategory('ostanavlivatsya')}
+                                    className={`px-4 py-2 rounded-lg ${
+                                        selectedCategory === 'ostanavlivatsya' 
+                                            ? 'bg-blue-500 text-white' 
+                                            : 'bg-white border hover:bg-gray-50'
+                                    }`}
+                                >
+                                    ⏸️ Останавливаться-остановиться
+                                </button>
+                                <button
+                                    onClick={() => setSelectedCategory('stanovitsya')}
+                                    className={`px-4 py-2 rounded-lg ${
+                                        selectedCategory === 'stanovitsya' 
+                                            ? 'bg-blue-500 text-white' 
+                                            : 'bg-white border hover:bg-gray-50'
+                                    }`}
+                                >
+                                    ✨ Становиться-стать
+                                </button>
+                            </div>
 
-    function renderVocabulary() {
-        return `
-            <div class="space-y-6">
-                ${Object.entries(vocabulary).map(([category, words]) => `
-                    <div class="bg-white rounded-lg p-6 shadow-sm border">
-                        <h3 class="text-xl font-semibold mb-4 text-blue-600">
-                            ${category === 'ostavatsya' ? '🏠 Оставаться-остаться (to remain, to stay)' :
-                              category === 'ostanavlivatsya' ? '⏸️ Останавливаться-остановиться (to stop)' : 
-                              '✨ Становиться-стать (to become)'}
-                        </h3>
-                        <div class="grid gap-4">
-                            ${Object.entries(words).map(([word, info]) => `
-                                <div class="border-l-4 border-blue-200 pl-4">
-                                    <div class="flex items-center justify-between">
-                                        <h4 class="font-semibold text-lg">${word}</h4>
-                                        <button onclick="speakText('${word}')" class="text-blue-500 hover:text-blue-700">
-                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                                                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-                                            </svg>
+                            <div className="bg-white rounded-lg p-6 shadow-sm border">
+                                {showResult !== null && (
+                                    <div className={`mb-4 p-4 rounded-lg flex items-center gap-2 ${
+                                        showResult 
+                                            ? 'bg-green-100 text-green-800' 
+                                            : 'bg-red-100 text-red-800'
+                                    }`}>
+                                        {showResult ? <CheckCircle size={20} /> : <XCircle size={20} />}
+                                        {showResult ? 'Правильно!' : `Неправильно. Правильный ответ: ${currentTask?.answer || 'см. варианты выше'}`}
+                                    </div>
+                                )}
+                                
+                                {renderTask()}
+                                
+                                {currentTask && (
+                                    <div className="mt-6 flex gap-3">
+                                        {showResult === null ? (
+                                            <button
+                                                onClick={checkAnswer}
+                                                disabled={!userAnswer.trim()}
+                                                className="bg-green-500 text-white px-6 py-2 rounded-lg hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                            >
+                                                Проверить
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={generateRandomTask}
+                                                className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 flex items-center gap-2"
+                                            >
+                                                <RotateCcw size={16} />
+                                                Следующее задание
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={generateRandomTask}
+                                            className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 flex items-center gap-2"
+                                        >
+                                            <RotateCcw size={16} />
+                                            Новое задание
                                         </button>
                                     </div>
-                                    <p class="text-gray-600">${info.definition}</p>
-                                    <div class="flex items-center gap-2 mt-2">
-                                        <p class="text-green-700 flex-1">${info.example}</p>
-                                        <button onclick="speakText('${info.example.split(' (')[0].replace(/'/g, "\\\'")}')" class="text-green-600">
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                                            </svg>
-                                        </button>
-                                    </div>
-                                    <div class="mt-2">
-                                        <p class="text-sm text-gray-500 mb-2">${info.forms}</p>
-                                        <div class="space-y-1">
-                                            ${info.phrases.map(phrase => `
-                                                <div class="flex items-center gap-2">
-                                                    <span class="text-sm text-blue-600">• ${phrase}</span>
-                                                    <button onclick="speakText('${phrase.replace(/'/g, "\\\'")}')" class="text-blue-500">
-                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                                                        </svg>
-                                                    </button>
-                                                </div>
-                                            `).join('')}
-                                        </div>
+                                )}
+                            </div>
+
+                            {currentTask?.word && vocabulary[currentTask.category]?.[currentTask.word] && (
+                                <div className="bg-blue-50 rounded-lg p-4">
+                                    <h3 className="font-semibold text-blue-800 mb-2">Изучаемое слово:</h3>
+                                    <div className="text-blue-700">
+                                        <p className="font-medium">{currentTask.word}</p>
+                                        <p className="text-sm">{vocabulary[currentTask.category][currentTask.word].forms}</p>
                                     </div>
                                 </div>
-                            `).join('')}
+                            )}
                         </div>
-                    </div>
-                `).join('')}
+                    )}
+
+                    {activeTab === 'vocabulary' && renderVocabulary()}
+                </div>
             </div>
-        `;
-    }
+        );
+    };
 
-    window.switchTab = function(tab) {
-        state.activeTab = tab;
-        render();
-    }
-
-    window.setCategory = function(category) {
-        state.selectedCategory = category;
-        generateRandomTask();
-    }
-
-    window.setAnswer = function(value) {
-        state.userAnswer = value;
-    }
-
-    // Инициализация
-    generateRandomTask();
-    
-    }); // конец DOMContentLoaded
+    ReactDOM.render(React.createElement(RussianVerbsApp), document.getElementById('root'));
 </script>
