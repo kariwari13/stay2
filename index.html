@@ -1,5 +1,8 @@
 <script>
-    // Простой state management без React
+    // Весь код запускается только после загрузки страницы
+    document.addEventListener('DOMContentLoaded', function() {
+        
+    // State
     let state = {
         currentTask: null,
         userAnswer: '',
@@ -88,7 +91,8 @@
         {type:'situational',category:'all',question:'Выберите правильный глагол: Она ___ студенткой университета.',context:'She became a university student',expectedElements:['стала'],word:'mixed'}
     ];
 
-    function generateRandomTask() {
+    // Делаем функции глобальными
+    window.generateRandomTask = function() {
         const filteredTasks = state.selectedCategory === 'all' 
             ? sampleTasks 
             : sampleTasks.filter(task => task.category === state.selectedCategory);
@@ -99,7 +103,7 @@
         render();
     }
 
-    function checkAnswer() {
+    window.checkAnswer = function() {
         if (!state.currentTask) return;
         
         let isCorrect = false;
@@ -136,7 +140,7 @@
         render();
     }
 
-    function speakText(text) {
+    window.speakText = function(text) {
         if ('speechSynthesis' in window) {
             window.speechSynthesis.cancel();
             
@@ -152,8 +156,6 @@
                 const preferredVoices = [
                     voices.find(voice => voice.name.toLowerCase().includes('google') && voice.lang.startsWith('ru')),
                     voices.find(voice => voice.name.toLowerCase().includes('microsoft') && voice.lang.startsWith('ru')),
-                    voices.find(voice => voice.name.toLowerCase().includes('irina') && voice.lang.startsWith('ru')),
-                    voices.find(voice => voice.name.toLowerCase().includes('pavel') && voice.lang.startsWith('ru')),
                     voices.find(voice => voice.lang === 'ru-RU'),
                     voices.find(voice => voice.lang.startsWith('ru'))
                 ];
@@ -167,7 +169,7 @@
                 try {
                     window.speechSynthesis.speak(utterance);
                 } catch (error) {
-                    console.error('Speech synthesis error:', error);
+                    console.error('Speech error:', error);
                 }
             };
             
@@ -178,7 +180,6 @@
                     setVoice();
                     window.speechSynthesis.onvoiceschanged = null;
                 };
-                
                 setTimeout(() => {
                     if (window.speechSynthesis.getVoices().length === 0) {
                         window.speechSynthesis.speak(utterance);
@@ -188,9 +189,9 @@
         }
     }
 
-    function startRecording() {
+    window.startRecording = function() {
         if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-            alert('Ваш браузер не поддерживает распознавание речи. Попробуйте Chrome или Edge.');
+            alert('Ваш браузер не поддерживает распознавание речи.');
             return;
         }
 
@@ -200,7 +201,6 @@
         recognition.lang = 'ru-RU';
         recognition.continuous = false;
         recognition.interimResults = false;
-        recognition.maxAlternatives = 3;
         
         recognition.onstart = () => {
             state.isRecording = true;
@@ -213,32 +213,11 @@
             state.userAnswer = transcript;
             state.isRecording = false;
             render();
-            
-            if (state.currentTask && state.currentTask.type === 'listening') {
-                setTimeout(() => {
-                    checkAnswer();
-                }, 1000);
-            }
         };
         
-        recognition.onerror = (event) => {
+        recognition.onerror = () => {
             state.isRecording = false;
-            
-            let errorMessage = 'Ошибка распознавания речи. ';
-            switch(event.error) {
-                case 'no-speech':
-                    errorMessage += 'Речь не обнаружена. Попробуйте говорить громче.';
-                    break;
-                case 'audio-capture':
-                    errorMessage += 'Микрофон недоступен.';
-                    break;
-                case 'not-allowed':
-                    errorMessage += 'Доступ к микрофону запрещён.';
-                    break;
-                default:
-                    errorMessage += 'Попробуйте ещё раз.';
-            }
-            state.userAnswer = errorMessage;
+            state.userAnswer = 'Ошибка. Попробуйте снова.';
             render();
         };
         
@@ -252,6 +231,7 @@
 
     function render() {
         const root = document.getElementById('root');
+        if (!root) return;
         
         const html = `
             <div class="max-w-4xl mx-auto bg-gray-50 min-h-screen">
@@ -292,8 +272,6 @@
                         <svg class="mx-auto mb-1" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
                             <circle cx="9" cy="7" r="4"></circle>
-                            <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
-                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                         </svg>
                         Словарь
                     </button>
@@ -432,23 +410,19 @@
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
                                 <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-                                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
                             </svg>
                             Прослушать
                         </button>
                         <div class="flex items-center gap-2">
                             <button onclick="startRecording()" class="flex items-center gap-2 px-4 py-2 rounded-lg ${
                                 state.isRecording 
-                                    ? 'bg-red-500 hover:bg-red-600' 
-                                    : 'bg-blue-500 hover:bg-blue-600'
+                                    ? 'bg-red-500' 
+                                    : 'bg-blue-500'
                             } text-white">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    ${state.isRecording 
-                                        ? '<line x1="2" y1="2" x2="22" y2="22"></line><path d="M18.89 13.23A7.12 7.12 0 0 0 19 12v-2"></path>'
-                                        : '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>'
-                                    }
+                                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
                                 </svg>
-                                ${state.isRecording ? 'Остановить' : 'Записать ответ'}
+                                ${state.isRecording ? 'Слушаю...' : 'Записать ответ'}
                             </button>
                         </div>
                     </div>
@@ -460,11 +434,7 @@
                         <div class="bg-yellow-50 p-4 rounded-lg">
                             <h3 class="font-semibold text-yellow-800">Ситуация:</h3>
                             <p class="text-yellow-700">${task.question}</p>
-                            ${task.context ? `
-                                <p class="text-sm text-yellow-600 mt-2">
-                                    Контекст: ${task.context}
-                                </p>
-                            ` : ''}
+                            ${task.context ? `<p class="text-sm text-yellow-600 mt-2">Контекст: ${task.context}</p>` : ''}
                         </div>
                         <textarea oninput="setAnswer(this.value)" placeholder="Введите ваш ответ..." class="w-full p-3 border border-gray-300 rounded-lg" rows="3">${state.userAnswer}</textarea>
                     </div>
@@ -476,21 +446,12 @@
                         <p class="text-lg font-medium">${task.question}</p>
                         ${task.hint ? `<p class="text-sm text-gray-600">${task.hint}</p>` : ''}
                         <input type="text" value="${state.userAnswer}" oninput="setAnswer(this.value)" onkeypress="if(event.key==='Enter')checkAnswer()" placeholder="Введите ваш ответ..." class="w-full p-3 border border-gray-300 rounded-lg">
-                        <div class="flex gap-2">
-                            <button onclick="startRecording()" class="flex items-center gap-2 px-4 py-2 rounded-lg ${
-                                state.isRecording 
-                                    ? 'bg-red-500 hover:bg-red-600' 
-                                    : 'bg-blue-500 hover:bg-blue-600'
-                            } text-white">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    ${state.isRecording 
-                                        ? '<line x1="2" y1="2" x2="22" y2="22"></line>'
-                                        : '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>'
-                                    }
-                                </svg>
-                                Голосовой ответ
-                            </button>
-                        </div>
+                        <button onclick="startRecording()" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500 text-white">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                            </svg>
+                            Голосовой ответ
+                        </button>
                     </div>
                 `;
         }
@@ -515,17 +476,15 @@
                                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                 <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
                                                 <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-                                                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
                                             </svg>
                                         </button>
                                     </div>
                                     <p class="text-gray-600">${info.definition}</p>
                                     <div class="flex items-center gap-2 mt-2">
                                         <p class="text-green-700 flex-1">${info.example}</p>
-                                        <button onclick="speakText('${info.example.split(' (')[0].replace(/'/g, "\\\'")}')" class="text-green-600 hover:text-green-800">
+                                        <button onclick="speakText('${info.example.split(' (')[0].replace(/'/g, "\\\'")}')" class="text-green-600">
                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                 <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                                                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
                                             </svg>
                                         </button>
                                     </div>
@@ -535,10 +494,9 @@
                                             ${info.phrases.map(phrase => `
                                                 <div class="flex items-center gap-2">
                                                     <span class="text-sm text-blue-600">• ${phrase}</span>
-                                                    <button onclick="speakText('${phrase.replace(/'/g, "\\\'")}')" class="text-blue-500 hover:text-blue-700">
+                                                    <button onclick="speakText('${phrase.replace(/'/g, "\\\'")}')" class="text-blue-500">
                                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                                                            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
                                                         </svg>
                                                     </button>
                                                 </div>
@@ -554,20 +512,22 @@
         `;
     }
 
-    function switchTab(tab) {
+    window.switchTab = function(tab) {
         state.activeTab = tab;
         render();
     }
 
-    function setCategory(category) {
+    window.setCategory = function(category) {
         state.selectedCategory = category;
         generateRandomTask();
     }
 
-    function setAnswer(value) {
+    window.setAnswer = function(value) {
         state.userAnswer = value;
     }
 
     // Инициализация
     generateRandomTask();
+    
+    }); // конец DOMContentLoaded
 </script>
